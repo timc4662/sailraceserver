@@ -1,0 +1,255 @@
+syntax = "proto3";
+
+// The grpc proto file for sailrace dinghy race timer.
+// Defines the messages and service interface.
+// This is used for redundancy and syncing between apps.
+
+// To generate: 
+
+// protoc --dart_out=grpc:. ./repository/remote/grpc/protos/sailrace.proto
+// protoc --go_out=. --go-grpc_out=. --go-grpc_opt=paths=source_relative protos/sailrace.proto
+
+option go_package = "github.com/timc4662/sailraceserver/protos/sailrace";
+
+package sailrace;
+
+service Sailrace {
+  rpc Ping(PingRequest) returns (PingReply) {}
+  rpc UpsertSeries (UpsertSeriesRequest) returns (UpsertSeriesReply) {}
+  rpc DeleteSeries (DeleteSeriesRequest) returns (DeleteSeriesReply) {}
+  rpc UpsertRaces(UpsertRacesRequest) returns (UpsertRacesReply) {}
+  rpc DeleteRaces(DeleteRacesRequest) returns (DeleteRacesReply) {}
+  rpc UpsertParticipants(UpsertParticipantsRequest) returns (UpsertParticipantsReply) {}
+  rpc DeleteParticipants(DeleteParticipantsRequest) returns (DeleteParticipantsReply) {}
+  rpc UpsertFleets(UpsertFleetsRequest) returns (UpsertFleetsReply) {}
+  rpc UpsertRacers(UpsertRacersRequest) returns (UpsertRacersReply){}  
+  rpc DeleteRacers(DeleteRacersRequest) returns (DeleteRacersReply){}
+}
+
+message Status {
+  bool success = 1;
+  string errorMessage = 2;
+}
+
+message PingRequest {
+  repeated string addresslist = 1;
+  int32 port = 2;
+}
+
+message PingReply {
+  Status status = 1;
+}
+
+message UpsertSeriesRequest {
+  repeated Series series = 1;
+  bool snapshot = 2;
+}
+
+message UpsertSeriesReply {
+  Status status = 1;
+}
+
+message DeleteSeriesRequest {
+  repeated string seriesKeys = 1;
+}
+
+message DeleteSeriesReply {
+  Status status = 1;
+}
+
+message UpsertRacesRequest {
+  string seriesKey = 1;
+  repeated Race races = 2;
+  bool snapshot = 3;
+}
+
+message UpsertRacesReply {
+  Status status = 1;
+}
+
+message DeleteRacesRequest {
+  string seriesKey = 1;
+  repeated string raceKeys = 2;
+}
+
+message DeleteRacesReply {
+  Status status = 1;
+}
+
+message UpsertParticipantsRequest {
+  string seriesKey = 1;
+  repeated Participant participants = 2;
+  bool snapshot = 3;
+}
+
+message UpsertParticipantsReply {
+  Status status = 1;
+}
+
+message DeleteParticipantsRequest {
+  string seriesKey = 1;
+  repeated string participantKeys = 2;
+}
+
+message DeleteParticipantsReply {
+  Status status = 1;
+}
+
+message UpsertFleetsRequest {
+  string seriesKey = 1;
+  repeated Fleet fleets = 2;
+  bool snapshot = 3;
+}
+
+message UpsertFleetsReply {
+  Status status = 1; 
+}
+
+message UpsertRacersRequest {
+  string raceKey = 1;
+  string seriesKey = 2;
+  repeated Racer racers = 3;
+  bool snapshot = 4;
+}
+
+message UpsertRacersReply {
+  Status status = 1;
+}
+
+message DeleteRacersRequest {
+  string raceKey = 1;
+  string seriesKey = 2;
+  repeated string racerKeys = 3;
+}
+
+message DeleteRacersReply {
+  Status status = 1;
+}
+
+// Describes a series.
+message Series {
+  string key = 1;   // The series identifier 
+  string name = 2;  // The series name
+}
+
+// Describes the current state of a race (fleet).
+enum RaceState {
+  NotStarted = 0;   // race not started
+  Prestart = 1;     // race in prestart
+  Warning = 2;      // race in prep (5 min window)
+  FirstPrep = 3;    // race in 4 min window
+  SecondPrep = 4;   // race in 1 min window
+  ConfirmStart = 5; // race started, ocs, gen recall stage
+  IndRecall = 6;    // race in ind recall stage
+  InProgress = 7;   // race in progress (normal running)
+  Finishing = 8;    // race now finishing (capture final lap times)
+  Finished = 9;     // race is now finished
+}
+
+// Describes the type of race
+enum RaceType { 
+  SingleFleet = 0;  // its a normal fleet race
+  Pursuit = 1;      // its a pursuit race
+  MultiFleet = 2;   // its a multi-fleet race (multi starts)
+}
+
+// Describes a start sequence
+message Sequence {
+  int32 warn = 1;
+  int32 prep1 = 2;
+  int32 prep2 = 3;
+}
+
+// Describes the recall mode for general recalls. 
+enum RecallMode { 
+  MoveToBack = 0; // Move current fleet to end 
+  Hold = 1;       // Restart current fleet now
+}
+
+// Describes a race/fleet start
+message FleetStart {
+  string fleet = 1;             // The fleet (i.e. fast/slow)
+  string started = 2;           // The date/time when this fleet started
+  string completed = 3;         // The date/time when this fleet completed (if finished)
+  int32 secondsSinceEpoch = 4;  // The number of seconds offset from the race epoch     
+  int32 prestartDuration = 5;   // The number of seconds in the pre-start
+  Sequence seq = 6;             // The start sequence for this start
+  int32 recallDelay = 7;        // The number of seconds in the recall delay, used when recall mode is Hold.
+  RecallMode recallMode = 8;    // The recall mode
+  RaceState raceState = 9;      // The current race state for this start.
+}
+
+// Describes when a class should start in a pursuit race
+message PursuitStartTimeDelta {
+  string cls = 1;       // the class or a csv list of classes
+  int32 py = 2;         // the py of the classes
+  int32 delta = 3;      // the delta in seconds from start;
+  int32 prevDelta = 4;  // the delta in seconds from the prev class
+}
+
+// Describes a fleet
+message Fleet {
+  string key = 1;         // The fleet identifier
+  string name = 2;        // The name of the fleet (fast/slow etc)
+  int32 position  = 3;    // The start position 
+  Sequence seq = 4;       // The start sequence for this fleet
+  RecallMode mode = 5;    // The recall mode for this fleet (i.e. restart now, or move to back)
+  int32 recallDelay = 6;  // The delay if restarting now
+  int32 minPN = 7;        // The min py (inclusive) for this fleet
+  int32 maxPN = 8;        // The max py (inclusive) for this fleet
+}
+
+// Describes a race.
+message Race {
+  string key = 1;                 // The race identifier
+  int32 raceNumber = 2;           // The race number
+  repeated FleetStart starts = 3; // The fleets/starts in this race
+  RaceType raceType = 4;          // The type of race (fleet, pursuit etc)
+  bool liveMode = 5;              // True if this should be sent out live over cloud
+  repeated PursuitStartTimeDelta pursuitRaceDeltas = 6; // Deltas for pursuit races
+  int32 pursuitRaceTargetTime = 7;  // The pursuit race target times in seconds
+  int32 sequenceNumber = 8;         // A sequence number (updated each write)
+  string epoch = 9;                 // this is the date time the clock starts. The fleet offsets are based on this time.
+  string scheduledTime = 10;        // scheduled time for the start
+}
+
+// A competitor
+message Participant {
+  string key = 1;         // The identifier
+  string sailNumber = 2;  // The sail number
+  string helm = 3;        // The helm name
+  string crew = 4;        // The crew name
+  string boatClass = 5;   // The class 
+  int32 py = 6;           // The handicap
+  string fleet = 7;       // The fleet
+}
+
+// Contains the lap times etc for a participant in a race
+message Racer {
+
+  message Lap {
+    int32 elasped = 1; // elapsed time in seconds
+    double corrected = 2; // the corrected time for this lap in fractions of a second.
+    double mostLaps = 3; // an estimate of the most laps covered by the furthest boat
+  }
+
+  enum Code {
+    FIN = 0;      // finished
+    OCS = 1;      // on course side at start of race
+    DNF = 2;      // started but did not finish
+    RET = 3;      // started but did not finish (some pref)
+    DSQ = 4;      //disqualified
+    DNC = 5;      // did not complete, did not come to start, same as DNS
+    NONE = 6;     // no code
+  }
+
+  string key = 1;             // the key of the racers
+  Participant participant = 2;  // the associated participant key
+  repeated Lap laps = 3;      // the lap times
+  Code code = 4;              // the result code for this racer. NONE if in progress.
+  bool talliedOn = 5;         // whether this racer is tallied on or not.
+  bool started = 6;           // A flag which is true when started (fleet or pursuit)
+  int32 position = 7;         // Used for pursuit race positions.
+  int32 sequenceNumber = 8;   // A sequence number incremented on write
+}
+
